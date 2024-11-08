@@ -6,7 +6,7 @@ import bm4d
 from bm4d.profiles import BM4DProfile, BM4DProfileLC
 
 def mwr(Vin, sigma_noise, wedge, plot_flag=0, T=300, Tb=100, beta=0.00004):
-    sigma_excite = sigma_noise
+    sigma_excite = torch.tensor([sigma_noise])
     #dim = Vin.shape
     y = Vin
     y_spectrum = torch.fft.fftn(y)
@@ -15,8 +15,11 @@ def mwr(Vin, sigma_noise, wedge, plot_flag=0, T=300, Tb=100, beta=0.00004):
     reject_hist = torch.zeros(T)
 
     # Add noise
-    x_initial = torch.fft.fftn(y + torch.normal(mean = torch.zeros_like(Vin),
-                                                                std = sigma_excite * torch.ones_like(Vin)))
+    x_initial = torch.fft.fftn(y + (sigma_excite * torch.normal(mean = torch.zeros_like(Vin),
+                                                std = torch.ones_like(Vin))))
+    #what if we could do element-wise characterisation of the std to be non-stationary?
+    #would this violate the bm4d assumptions?
+
     x_initial[wedge == 1] = y_spectrum[wedge == 1]
     x_initial = torch.real(torch.fft.ifftn(x_initial))
     x_current = denoise(x_initial, sigma_noise)
@@ -53,7 +56,9 @@ def mwr(Vin, sigma_noise, wedge, plot_flag=0, T=300, Tb=100, beta=0.00004):
         deltaP = np.exp(-deltaU / beta)
 
         # Accept/reject according to Metropolis
+        #print(Ucurrent, Uproposed, deltaU, deltaP)
         ak = np.random.rand() #unknown about this
+        #print(ak, 'ak')
         if deltaU < 0:
             x_current = z
         else:
@@ -69,8 +74,8 @@ def mwr(Vin, sigma_noise, wedge, plot_flag=0, T=300, Tb=100, beta=0.00004):
             normFactor += 1
 
         # Plotting (if needed)
-        #if plot_flag == 1:
-            #plot_results(y, z, x_mmse, plotrange, plotrangeS, reject_hist, t)
+        if (t +1)% 5 == 0:
+            plot_results(y, z, x_mmse, plotrange, plotrangeS, reject_hist, t)
 
         print(f'Iteration {t + 1} / {T} ...')
 
